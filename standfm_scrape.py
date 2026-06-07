@@ -74,10 +74,13 @@ def parse_feed(xml_bytes: bytes) -> tuple[str, list[dict]]:
             date = "0000-00-00"
         title = (item.findtext("title") or "untitled").strip()
         ext = Path(urllib.parse.urlparse(url).path).suffix or ".m4a"
+        # <link>/<guid> are the episode page URL — what we paste in SNS posts.
+        page = (item.findtext("link") or item.findtext("guid") or "").strip()
         episodes.append({
             "date": date,
             "title": title,
             "url": url,
+            "page": page,
             "guid": (item.findtext("guid") or "").strip(),
             "filename": f"{date}_{slugify(title)}{ext}",
         })
@@ -126,7 +129,7 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     # write manifest next to audio dir's parent (cwd)
     with open("manifest.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["date", "title", "filename", "url", "guid"])
+        w = csv.DictWriter(f, fieldnames=["date", "title", "filename", "page", "url", "guid"])
         w.writeheader()
         w.writerows(episodes)
     Path("manifest.json").write_text(

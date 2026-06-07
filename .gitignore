@@ -3,6 +3,10 @@ audio/
 transcripts/
 manifest.csv
 manifest.json
+.read/
+
+# generated SNS posts (date-prefixed); keep the hand-written EXAMPLE_ references
+posts/2*.md
 *.pyc
 __pycache__/
 transcribe.log

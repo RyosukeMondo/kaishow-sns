@@ -37,12 +37,42 @@ stdlib only) and runs anywhere with `curl`.
 
 - **`standfm_scrape.py`** — fetch the RSS feed, parse episodes, download each
   `.m4a` (resumable via `curl -C -`, skips existing). Writes `manifest.csv` /
-  `manifest.json` with title, date, url, and local filename per episode.
+  `manifest.json` with title, date, **episode page URL**, and local filename.
   - `python3 standfm_scrape.py <channel> --list` — list episodes, download nothing.
 - **`transcribe_all.sh`** — run `~/repos/whisper/transcribe.py` over `audio/`,
   one file at a time, skipping episodes already transcribed. Forces `-l ja` and
   `-m large-v3` (Japanese auto-detect is unreliable on quiet intros).
+- **`generate_posts.py`** — turn each transcript into a ready-to-post SNS
+  teaser (see below).
+- **`prompts/voice_guide.md`** — the editable voice/format spec the generator
+  uses. **Tune the host's voice here** by pasting his past high-performing posts.
+- **`posts/EXAMPLE_*.md`** — hand-written gold-standard post(s), the quality bar.
 - **`run_pipeline.sh`** — scrape → transcribe, end to end.
+
+## SNS post generation (`generate_posts.py`)
+
+Implements the client's brief: from an archive episode, produce an **editable
+SNS post** that outlines the episode, **withholds the punchline (teaser)**,
+sounds like the host, and ends with a link back to the archive.
+
+```bash
+python3 generate_posts.py                         # all transcripts → posts/
+python3 generate_posts.py --only 251012           # one episode
+python3 generate_posts.py --backend claude        # higher quality (vs default claude-minimax)
+python3 generate_posts.py --force                 # regenerate existing
+```
+
+Each `posts/<episode>.md` contains: an internal 概略, a copy-paste **Facebook**
+post, an **Instagram** version with hashtags, and 3 alternate hooks to choose
+from. The `{{LINK}}` placeholder is auto-filled with the episode URL.
+
+**Voice tuning is data, not code:** edit `prompts/voice_guide.md` (especially
+the "お手本投稿" few-shot slot at the bottom) and re-run with `--force`. The
+hand-written `posts/EXAMPLE_*.md` shows the target quality.
+
+> Note: `claude-minimax` (the cheap default, a headless Claude Code session) can
+> be slow/flaky on long transcripts. For client-facing copy prefer
+> `--backend claude`, or refine the hand-written examples directly.
 
 ## Output naming
 
