@@ -1,0 +1,7 @@
+# downloaded media + generated transcripts (regenerable from the channel)
+audio/
+transcripts/
+manifest.csv
+manifest.json
+*.pyc
+__pycache__/
