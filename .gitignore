@@ -5,3 +5,5 @@ manifest.csv
 manifest.json
 *.pyc
 __pycache__/
+transcribe.log
+.smoketest/
