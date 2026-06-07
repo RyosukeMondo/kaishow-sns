@@ -23,6 +23,7 @@ import sys
 from pathlib import Path
 
 GUIDE = Path("prompts/voice_guide.md")
+SAMPLES = Path("prompts/fb_samples.md")  # auto-extracted FB voice few-shot (local only)
 
 
 def load_manifest() -> dict:
@@ -66,6 +67,9 @@ def main() -> None:
     if not GUIDE.exists():
         sys.exit(f"voice guide not found: {GUIDE}")
     guide = GUIDE.read_text(encoding="utf-8")
+    if SAMPLES.exists():
+        guide += "\n\n" + SAMPLES.read_text(encoding="utf-8")
+        print(f"  (voice few-shot: {SAMPLES})")
     manifest = load_manifest()
     args.out.mkdir(parents=True, exist_ok=True)
 

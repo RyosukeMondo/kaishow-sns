@@ -74,6 +74,57 @@ hand-written `posts/EXAMPLE_*.md` shows the target quality.
 > be slow/flaky on long transcripts. For client-facing copy prefer
 > `--backend claude`, or refine the hand-written examples directly.
 
+## Voice matching from Facebook (`extract_voice.py`)
+
+The host's real voice is learned from his **highest-engagement Facebook posts**,
+pulled from the `facebook-scraper` SQLite DB:
+
+```bash
+python3 extract_voice.py --profile santa.kinoshita --min-reactions 70 --top 12
+```
+
+This writes `prompts/fb_samples.md` (his top posts as few-shot), which
+`generate_posts.py` automatically appends to every prompt.
+
+> **Privacy:** `prompts/fb_samples.md` holds his *personal* FB posts and is
+> **git-ignored — never published.** Only the generated promo copy goes public.
+
+## End-to-end auto-pipeline (`sync.sh`)
+
+Detect new episodes → download → transcribe → refresh voice → generate drafts →
+rebuild site → publish. Every stage is idempotent, so it's safe on a schedule.
+
+```bash
+./sync.sh                     # default channel: full run + publish to Pages
+NO_PUBLISH=1 ./sync.sh        # build everything locally, don't push
+```
+
+Run it on a timer (e.g. cron, hourly) to auto-publish new episodes:
+
+```cron
+0 * * * * cd /home/rmondo/repos/stand-fm-scrape && flock -n .sync.lock ./sync.sh >> sync.log 2>&1
+```
+
+## Published site (`build_site.py` → GitHub Pages)
+
+`build_site.py` renders `docs/` (served by Pages from `/docs`): an episode
+index plus a per-episode page with the summary, **copy-paste FB & IG boxes
+(with copy buttons)**, hooks, and the full transcript. `<meta noindex>` keeps it
+out of search results. The host opens an episode, hits コピー, pastes into Facebook.
+
+First-time publish:
+
+```bash
+gh repo create kaishow-sns --public --source=. --remote=origin
+python3 build_site.py
+git add -A && git commit -m "init"
+git push -u origin main
+gh api -X POST repos/:owner/kaishow-sns/pages -f 'source[branch]=main' -f 'source[path]=/docs'
+# site: https://<user>.github.io/kaishow-sns/
+```
+
+After that, `./sync.sh` keeps it current automatically.
+
 ## Output naming
 
 `<YYYY-MM-DD>_<title>.m4a` → `<YYYY-MM-DD>_<title>.txt` / `.srt`, so audio and

@@ -7,6 +7,10 @@ manifest.json
 
 # generated SNS posts (date-prefixed); keep the hand-written EXAMPLE_ references
 posts/2*.md
+
+# voice few-shot = his PERSONAL FB posts — never publish
+prompts/fb_samples.md
+generate.log
 *.pyc
 __pycache__/
 transcribe.log
