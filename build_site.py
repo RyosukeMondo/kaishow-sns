@@ -15,6 +15,7 @@ import html
 import json
 import re
 import unicodedata
+from datetime import datetime
 from pathlib import Path
 
 CSS = """
@@ -43,6 +44,8 @@ max-height:60vh;overflow:auto;font-size:.92rem}
 .btnrow{margin:10px 0}.btnrow a{display:inline-block;background:#2a2e37;border-radius:8px;padding:8px 14px;margin-right:8px}
 footer{padding:24px 16px;color:var(--muted);font-size:.82rem;text-align:center}
 .pending{color:var(--muted);font-style:italic}
+.bar{background:#0c0e12;border:1px solid #2a2e37;border-radius:999px;height:14px;overflow:hidden;margin:6px 0}
+.bar-fill{background:linear-gradient(90deg,#2ea043,#4f8cff);height:100%;border-radius:999px;transition:width .4s}
 """
 
 COPY_JS = """
@@ -109,6 +112,7 @@ def main() -> None:
 
     cards = []
     built = 0
+    transcribed = 0
     for idx, ep in enumerate(sorted(episodes, key=lambda e: e["date"], reverse=True)):
         stem = nfc(Path(ep["filename"]).stem)
         pid = page_id(ep, idx)
@@ -116,6 +120,8 @@ def main() -> None:
         listen = ep.get("page") or ep.get("guid") or ""
         has_post = stem in posts
         has_txt = stem in txts
+        if has_txt:
+            transcribed += 1
 
         # ---- per-episode page ----
         body = [f'<p class="muted">{html.escape(ep["date"])}　'
@@ -151,8 +157,18 @@ def main() -> None:
             f'<span class="badge">{status}</span><br>'
             f'<a class="title" href="ep/{pid}.html">{html.escape(title)}</a></div>')
 
-    index_body = (f'<p class="muted">{len(episodes)}本のエピソード。'
-                  f'下書き生成済み {built}本。クリックでコピペ用ページへ。</p>'
+    total = len(episodes)
+    pct = round(built / total * 100) if total else 0
+    updated = datetime.now().strftime("%Y-%m-%d %H:%M")
+    progress = (
+        '<div class="card">'
+        f'<h2>進捗：下書き完成 {built} / {total}本（{pct}%）</h2>'
+        f'<div class="bar"><div class="bar-fill" style="width:{pct}%"></div></div>'
+        f'<p class="muted">✅ 下書きあり {built}　／　📝 文字起こし済 {transcribed}　／　'
+        f'⏳ 処理待ち {total - transcribed}<br>最終更新: {updated}</p>'
+        '</div>')
+    index_body = (progress +
+                  '<p class="muted">クリックでコピペ用ページへ。</p>'
                   f'<div class="ep-list">{"".join(cards)}</div>')
     (args.out / "index.html").write_text(
         html_page(f"{channel} — SNS下書き", index_body, ""), encoding="utf-8")
