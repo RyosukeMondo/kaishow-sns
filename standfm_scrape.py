@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -47,8 +48,14 @@ def fetch(url: str) -> bytes:
 
 
 def slugify(title: str, maxlen: int = 60) -> str:
-    """Filesystem-safe slug; keeps Japanese, drops path/shell-hostile chars."""
-    s = re.sub(r"[\\/:*?\"<>|\n\r\t]+", "", title).strip()
+    """Filesystem-safe slug; keeps Japanese, drops path/shell-hostile chars.
+
+    NFC-normalize so filenames are consistent: stand.fm's RSS sometimes returns
+    NFD-decomposed Japanese, which otherwise yields NFC/NFD duplicate files that
+    look identical but don't match.
+    """
+    s = unicodedata.normalize("NFC", title)
+    s = re.sub(r"[\\/:*?\"<>|\n\r\t]+", "", s).strip()
     s = re.sub(r"\s+", "_", s)
     return s[:maxlen] or "untitled"
 
