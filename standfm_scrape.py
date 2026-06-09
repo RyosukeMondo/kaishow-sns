@@ -21,14 +21,18 @@ import re
 import subprocess
 import sys
 import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
 RSS_TMPL = "https://stand.fm/rss/{channel}"
+CHANNEL_TMPL = "https://stand.fm/channels/{channel}"
+EPISODE_TMPL = "https://stand.fm/episodes/{episode}"
 
 
 def resolve_channel_id(arg: str) -> str:
@@ -96,6 +100,88 @@ def parse_feed(xml_bytes: bytes) -> tuple[str, list[dict]]:
     return channel_title, episodes
 
 
+# --- Page-scrape fallback (when RSS distribution is OFF) ----------------------
+# A stand.fm channel only exposes /rss/<id> once its owner enables podcast/RSS
+# distribution. Until then the feed 404s even though episodes are public on the
+# web. As a fallback we read the SPA's server-rendered HTML: the channel page
+# lists episode ids, and each episode page embeds its audio URL, title and
+# publish time. This is heavier (one request per episode) and more brittle than
+# RSS — so RSS stays the first choice and this only runs when RSS is missing.
+_EP_ID_RE = re.compile(r"/episodes/([a-f0-9]{16,})")
+_AUDIO_RE = re.compile(r"https://cdncf\.stand\.fm/audios/[A-Za-z0-9]+\.m4a")
+_TITLE_RE = re.compile(r'"title":"((?:[^"\\]|\\.)*)","duration"')
+_PUB_RE = re.compile(r'"publishedAt":(\d{10,})')
+_CH_NAME_RE = re.compile(r'"channelName":"((?:[^"\\]|\\.)*)"')
+
+
+def _unescape_json_str(raw: str) -> str:
+    """Turn a raw JSON string body (without quotes) into text, tolerating any
+    \\uXXXX / escape sequences embedded in the page."""
+    try:
+        return json.loads(f'"{raw}"')
+    except json.JSONDecodeError:
+        return raw
+
+
+def fetch_episode_via_page(episode_id: str) -> dict | None:
+    """Scrape one episode page → the same dict shape parse_feed yields."""
+    html = fetch(EPISODE_TMPL.format(episode=episode_id)).decode("utf-8", "replace")
+    am = _AUDIO_RE.search(html)
+    if not am:
+        return None
+    url = am.group(0)
+    tm = _TITLE_RE.search(html)
+    title = _unescape_json_str(tm.group(1)) if tm else "untitled"
+    pubs = [int(x) for x in _PUB_RE.findall(html)]
+    ts = max(pubs) if pubs else 0
+    date = (
+        datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        if ts
+        else "0000-00-00"
+    )
+    ext = Path(urllib.parse.urlparse(url).path).suffix or ".m4a"
+    page = EPISODE_TMPL.format(episode=episode_id)
+    return {
+        "date": date,
+        "title": title,
+        "url": url,
+        "page": page,
+        "guid": episode_id,
+        "filename": f"{date}_{slugify(title)}{ext}",
+    }
+
+
+def scrape_via_pages(cid: str) -> tuple[str, list[dict]]:
+    """RSS-less fallback: list episodes from the channel page, then fetch each
+    episode page for its audio URL/title/date."""
+    html = fetch(CHANNEL_TMPL.format(channel=cid)).decode("utf-8", "replace")
+    # preserve first-seen order, dedup
+    episode_ids = list(dict.fromkeys(_EP_ID_RE.findall(html)))
+    cm = _CH_NAME_RE.search(html)
+    channel_title = _unescape_json_str(cm.group(1)) if cm and cm.group(1) else cid
+    episodes: list[dict] = []
+    for eid in episode_ids:
+        meta = fetch_episode_via_page(eid)
+        if meta:
+            episodes.append(meta)
+    episodes.sort(key=lambda e: e["date"])
+    return channel_title, episodes
+
+
+def load_episodes(cid: str, rss_url: str) -> tuple[str, list[dict]]:
+    """Try RSS first; on a 404 (RSS distribution off) fall back to page-scrape."""
+    try:
+        return parse_feed(fetch(rss_url))
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+        print(
+            f"  RSS feed 404 (distribution off) — falling back to page scrape.",
+            file=sys.stderr,
+        )
+        return scrape_via_pages(cid)
+
+
 def download(url: str, dest: Path) -> bool:
     """Resumable, retrying download via curl. Skip if already complete."""
     if dest.exists() and dest.stat().st_size > 0:
@@ -129,7 +215,7 @@ def main() -> None:
     print(f"Channel id : {cid}")
     print(f"RSS feed   : {rss_url}")
 
-    title, episodes = parse_feed(fetch(rss_url))
+    title, episodes = load_episodes(cid, rss_url)
     print(f"Channel    : {title}")
     print(f"Episodes   : {len(episodes)}\n")
 
