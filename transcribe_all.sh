@@ -16,7 +16,8 @@ MODEL="${MODEL:-large-v3}"
 LANG="${LANG_CODE:-ja}"
 
 [ -x "$PY" ] || { echo "whisper venv python not found at $PY" >&2; exit 1; }
-[ -d "$AUDIO_DIR" ] || { echo "audio dir not found: $AUDIO_DIR" >&2; exit 1; }
+# AUDIO_DIR may be a directory or a single .m4a file (find handles both)
+[ -e "$AUDIO_DIR" ] || { echo "audio path not found: $AUDIO_DIR" >&2; exit 1; }
 
 mkdir -p "$OUT_DIR"
 total=$(find "$AUDIO_DIR" -type f -name '*.m4a' | wc -l)

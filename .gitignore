@@ -14,6 +14,7 @@ summaries/
 
 # per-channel publish clones (each channel's Pages repo)
 .publish/
+.publish.lock
 
 # voice few-shot = his PERSONAL FB posts — never publish
 **/prompts/fb_samples.md
