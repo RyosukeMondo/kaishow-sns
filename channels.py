@@ -302,12 +302,36 @@ def format_table(channels: list[Channel]) -> str:
     return "\n".join(lines)
 
 
+def format_env(c: Channel) -> str:
+    """Shell-evalable exports for one channel — `eval "$(channels.py env <slug>)"`."""
+    import shlex
+
+    pairs = {
+        "CH_ID": c.id,
+        "CH_SLUG": c.slug,
+        "CH_NAME": c.name,
+        "CH_DIR": str(c.dir),
+        "CH_BACKEND": c.backend,
+        "CH_REPO": c.repo,
+        "CH_REPO_NAME": c.repo_name,
+        "CH_PUBLISH_DIR": str(c.publish_dir),
+        "CH_PAGES_URL": c.pages_url,
+        "CH_ENABLED": "1" if c.enabled else "0",
+    }
+    return "\n".join(f"export {k}={shlex.quote(v)}" for k, v in pairs.items())
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Inspect the stand.fm channel registry")
     sub = ap.add_subparsers(dest="cmd")
     sub.add_parser("list", help="print the channel table (default)")
+    p_env = sub.add_parser("env", help="print shell exports for one channel")
+    p_env.add_argument("channel", help="channel id, slug, or URL")
     args = ap.parse_args(argv)
     reg = load()
+    if args.cmd == "env":
+        print(format_env(reg.require(args.channel)))
+        return 0
     if args.cmd in (None, "list"):
         print(format_table(reg.all()))
         return 0

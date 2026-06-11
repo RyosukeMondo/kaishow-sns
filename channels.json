@@ -15,7 +15,7 @@
       "name": "とっ散らかりチャンネル",
       "enabled": true,
       "repo": "RyosukeMondo/tocchirakari-fm",
-      "backend": "claude",
+      "backend": "claude-minimax",
       "fb_profile": ""
     }
   ]

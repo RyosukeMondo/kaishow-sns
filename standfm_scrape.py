@@ -201,6 +201,34 @@ def download(url: str, dest: Path) -> bool:
     return True
 
 
+def merge_with_manifest(title: str, episodes: list[dict]) -> tuple[str, list[dict]]:
+    """Union the freshly-scraped episode list with the existing manifest.
+
+    URL-limited (限定公開) episodes never appear in the RSS feed or on the
+    channel page — they only enter the manifest via --episode. A plain
+    overwrite would silently drop them on the next scheduled run, so keep
+    every previously-known episode the feed no longer (or never) lists.
+    Fresh data wins for episodes present in both."""
+    try:
+        old = json.loads(Path("manifest.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, ValueError):
+        return title, episodes
+    by_guid = {e["guid"]: e for e in old.get("episodes", [])}
+    by_guid.update({e["guid"]: e for e in episodes})
+    merged = sorted(by_guid.values(), key=lambda e: e["date"])
+    return title or old.get("channel", ""), merged
+
+
+def write_manifest(title: str, cid: str, episodes: list[dict]) -> None:
+    with open("manifest.csv", "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["date", "title", "filename", "page", "url", "guid"])
+        w.writeheader()
+        w.writerows(episodes)
+    Path("manifest.json").write_text(
+        json.dumps({"channel": title, "channelId": cid, "episodes": episodes},
+                   ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Download a stand.fm channel's audio")
     ap.add_argument("channel", help="channel id, channel URL, or rss URL")
@@ -208,6 +236,9 @@ def main() -> None:
                     help="audio output dir (default: audio)")
     ap.add_argument("--list", action="store_true",
                     help="list episodes only, do not download")
+    ap.add_argument("--episode", action="append", default=[],
+                    help="also fetch this episode id/URL via page scrape — for "
+                         "URL-limited (限定公開) episodes absent from RSS; repeatable")
     args = ap.parse_args()
 
     cid = resolve_channel_id(args.channel)
@@ -216,18 +247,23 @@ def main() -> None:
     print(f"RSS feed   : {rss_url}")
 
     title, episodes = load_episodes(cid, rss_url)
+    for arg in args.episode:
+        m = re.search(r"(?:episodes/)?([a-f0-9]{16,})", arg)
+        if not m:
+            raise SystemExit(f"could not parse an episode id from: {arg!r}")
+        meta = fetch_episode_via_page(m.group(1))
+        if meta is None:
+            raise SystemExit(f"no audio found on episode page: {arg}")
+        episodes.append(meta)
+        print(f"  + URL-limited episode: {meta['date']}  {meta['title']}")
+
+    title, episodes = merge_with_manifest(title, episodes)
     print(f"Channel    : {title}")
     print(f"Episodes   : {len(episodes)}\n")
 
     args.out.mkdir(parents=True, exist_ok=True)
     # write manifest next to audio dir's parent (cwd)
-    with open("manifest.csv", "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["date", "title", "filename", "page", "url", "guid"])
-        w.writeheader()
-        w.writerows(episodes)
-    Path("manifest.json").write_text(
-        json.dumps({"channel": title, "channelId": cid, "episodes": episodes},
-                   ensure_ascii=False, indent=2), encoding="utf-8")
+    write_manifest(title, cid, episodes)
 
     if args.list:
         for e in episodes:

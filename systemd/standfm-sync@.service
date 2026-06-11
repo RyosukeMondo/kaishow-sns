@@ -1,0 +1,14 @@
+[Unit]
+Description=stand.fm channel sync (%i): scrape, transcribe, summarize, publish
+# Needs network for scraping/publishing and the GPU for whisper; oneshot and
+# idempotent, so a failed run is simply retried at the next timer tick.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/stand-fm-scrape
+ExecStart=%h/repos/stand-fm-scrape/sync_channel.sh %i
+# whisper large-v3 + LLM summaries can take a while on a backlog
+TimeoutStartSec=4h
+Nice=10

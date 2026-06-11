@@ -1,0 +1,12 @@
+[Unit]
+Description=Run stand.fm channel sync (%i) on a schedule
+
+[Timer]
+# Every 6 hours; catches up after suspend/boot. The pipeline is idempotent,
+# so a tick with no new episodes is just an RSS fetch.
+OnCalendar=00/6:30
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
