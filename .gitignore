@@ -6,10 +6,17 @@ manifest.json
 .read/
 
 # generated SNS posts (date-prefixed); keep the hand-written EXAMPLE_ references
-posts/2*.md
+**/posts/2*.md
+
+# generated episode summaries + per-channel runtime state (regenerable)
+summaries/
+.state.json
+
+# per-channel publish clones (each channel's Pages repo)
+.publish/
 
 # voice few-shot = his PERSONAL FB posts — never publish
-prompts/fb_samples.md
+**/prompts/fb_samples.md
 generate*.log
 *.pyc
 __pycache__/

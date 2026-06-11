@@ -1,0 +1,22 @@
+{
+  "channels": [
+    {
+      "id": "68ea666671fa3adc9777a5fb",
+      "slug": "kaishow",
+      "name": "KAISHOWチャンネル",
+      "enabled": true,
+      "repo": "RyosukeMondo/kaishow-sns",
+      "backend": "claude",
+      "fb_profile": "santa.kinoshita"
+    },
+    {
+      "id": "6a27cb5b2006d36b19101c07",
+      "slug": "tocchirakari",
+      "name": "とっ散らかりチャンネル",
+      "enabled": true,
+      "repo": "RyosukeMondo/tocchirakari-fm",
+      "backend": "claude",
+      "fb_profile": ""
+    }
+  ]
+}

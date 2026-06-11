@@ -29,6 +29,8 @@ from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
+import channels as chan
+
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
 RSS_TMPL = "https://stand.fm/rss/{channel}"
 CHANNEL_TMPL = "https://stand.fm/channels/{channel}"
@@ -37,12 +39,10 @@ EPISODE_TMPL = "https://stand.fm/episodes/{episode}"
 
 def resolve_channel_id(arg: str) -> str:
     """Accept a channel id, a channel URL, or an rss URL → return channel id."""
-    m = re.search(r"(?:channels/|rss/)([a-f0-9]{16,})", arg)
-    if m:
-        return m.group(1)
-    if re.fullmatch(r"[a-f0-9]{16,}", arg):
-        return arg
-    raise SystemExit(f"Could not parse a channel id from: {arg!r}")
+    try:
+        return chan.resolve_channel_id(arg)
+    except ValueError as e:
+        raise SystemExit(str(e))
 
 
 def fetch(url: str) -> bytes:
