@@ -46,12 +46,38 @@ footer{padding:24px 16px;color:var(--muted);font-size:.82rem;text-align:center}
 .pending{color:var(--muted);font-style:italic}
 .bar{background:#0c0e12;border:1px solid #2a2e37;border-radius:999px;height:14px;overflow:hidden;margin:6px 0}
 .bar-fill{background:linear-gradient(90deg,#2ea043,#4f8cff);height:100%;border-radius:999px;transition:width .4s}
+.ep-list .card{display:flex;align-items:flex-start;gap:12px}
+.posted{display:flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--muted);font-size:.82rem;
+white-space:nowrap;cursor:pointer;user-select:none;padding-top:2px}
+.posted input{width:18px;height:18px;accent-color:var(--ok);cursor:pointer;margin:0}
+.ep-main{flex:1 1 auto;min-width:0}
+.card.done{opacity:.55}
+.card.done .title{text-decoration:line-through;color:var(--muted)}
+.card.done .posted{color:var(--ok)}
 """
 
 COPY_JS = """
 function copyEl(id,btn){const t=document.getElementById(id);t.select();
 navigator.clipboard.writeText(t.value).then(()=>{const o=btn.textContent;btn.textContent='コピーしました ✓';
 btn.classList.add('done');setTimeout(()=>{btn.textContent=o;btn.classList.remove('done')},1500)})}
+"""
+
+# "投稿済み" checkboxes persist in the host's browser via localStorage. Both
+# channels' Pages sites share the github.io origin, so the key is namespaced per
+# channel (KEY placeholder filled at build time) to keep their state separate.
+POSTED_JS = """
+(function(){var KEY=%s;
+function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){return {}}}
+function save(p){localStorage.setItem(KEY,JSON.stringify(p))}
+function count(){var n=Object.keys(load()).length;var el=document.getElementById('posted-count');
+if(el)el.textContent=n}
+document.addEventListener('DOMContentLoaded',function(){var p=load();
+document.querySelectorAll('.ep-list .card').forEach(function(card){
+var id=card.dataset.id,cb=card.querySelector('.posted-cb');if(!cb)return;
+if(p[id]){cb.checked=true;card.classList.add('done')}
+cb.addEventListener('change',function(){var p=load();
+if(cb.checked){p[id]=1;card.classList.add('done')}else{delete p[id];card.classList.remove('done')}
+save(p);count()})});count()})})();
 """
 
 SECTIONS = {
@@ -165,9 +191,11 @@ def main() -> None:
                   ("📋 要約あり" if has_summary else
                    ("📝 文字起こし済" if has_txt else "⏳ 処理待ち")))
         cards.append(
-            f'<div class="card"><span class="badge">{html.escape(ep["date"])}</span>'
+            f'<div class="card" data-id="{pid}">'
+            f'<label class="posted"><input type="checkbox" class="posted-cb">投稿済み</label>'
+            f'<div class="ep-main"><span class="badge">{html.escape(ep["date"])}</span>'
             f'<span class="badge">{status}</span><br>'
-            f'<a class="title" href="ep/{pid}.html">{html.escape(title)}</a></div>')
+            f'<a class="title" href="ep/{pid}.html">{html.escape(title)}</a></div></div>')
 
     total = len(episodes)
     pct = round(built / total * 100) if total else 0
@@ -177,11 +205,17 @@ def main() -> None:
         f'<h2>進捗：下書き・要約完成 {built} / {total}本（{pct}%）</h2>'
         f'<div class="bar"><div class="bar-fill" style="width:{pct}%"></div></div>'
         f'<p class="muted">✅ 下書きあり {built}　／　📝 文字起こし済 {transcribed}　／　'
-        f'⏳ 処理待ち {total - transcribed}<br>最終更新: {updated}</p>'
+        f'⏳ 処理待ち {total - transcribed}</p>'
+        f'<p class="muted">📮 投稿済み <b id="posted-count">0</b> / {total}本'
+        '（チェックはこの端末に保存されます）'
+        f'<br>最終更新: {updated}</p>'
         '</div>')
+    posted_script = f'<script>{POSTED_JS % json.dumps("posted:" + channel, ensure_ascii=False)}</script>'
     index_body = (progress +
-                  '<p class="muted">クリックでコピペ用ページへ。</p>'
-                  f'<div class="ep-list">{"".join(cards)}</div>')
+                  '<p class="muted">クリックでコピペ用ページへ。左の「投稿済み」に'
+                  'チェックを付けると投稿済みの回を区別できます。</p>'
+                  f'<div class="ep-list">{"".join(cards)}</div>'
+                  + posted_script)
     (args.out / "index.html").write_text(
         html_page(f"{channel} — SNS下書き", index_body, "", channel), encoding="utf-8")
     # Pages: don't run Jekyll

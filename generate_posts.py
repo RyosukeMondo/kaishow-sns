@@ -18,12 +18,24 @@ Idempotent: skips episodes whose post already exists (use --force to redo).
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 GUIDE = Path("prompts/voice_guide.md")
 SAMPLES = Path("prompts/fb_samples.md")  # auto-extracted FB voice few-shot (local only)
+
+# The host writes SNS copy in the first person "私" (the voice guide asks for it,
+# but an LLM still slips into the spoken "僕"/"俺" sometimes). Normalize the
+# generated copy so the published draft is always "私". 僕→私 / 俺→私 are clean
+# pronoun swaps; the negative lookbehind protects the rare 公僕/下僕/従僕 compounds.
+_FIRST_PERSON_RE = re.compile(r"(?<![公下従])[僕俺]")
+
+
+def normalize_first_person(text: str) -> str:
+    """Force the host's first-person pronoun to 「私」 in generated SNS copy."""
+    return _FIRST_PERSON_RE.sub("私", text)
 
 
 def load_manifest() -> dict:
@@ -102,7 +114,7 @@ def main() -> None:
         if not result:
             print(f"  ✗ empty result for {stem}", file=sys.stderr)
             continue
-        result = result.replace("{{LINK}}", link)
+        result = normalize_first_person(result.replace("{{LINK}}", link))
         out.write_text(result + "\n", encoding="utf-8")
         ok += 1
 

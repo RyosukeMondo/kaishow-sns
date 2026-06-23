@@ -327,10 +327,16 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("list", help="print the channel table (default)")
     p_env = sub.add_parser("env", help="print shell exports for one channel")
     p_env.add_argument("channel", help="channel id, slug, or URL")
+    p_slugs = sub.add_parser("slugs", help="print channel slugs, one per line (for scripting)")
+    p_slugs.add_argument("--enabled", action="store_true", help="only enabled channels")
     args = ap.parse_args(argv)
     reg = load()
     if args.cmd == "env":
         print(format_env(reg.require(args.channel)))
+        return 0
+    if args.cmd == "slugs":
+        for c in (reg.enabled() if args.enabled else reg.all()):
+            print(c.slug)
         return 0
     if args.cmd in (None, "list"):
         print(format_table(reg.all()))
