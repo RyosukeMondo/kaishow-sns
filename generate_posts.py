@@ -56,10 +56,19 @@ def build_prompt(guide: str, ep: dict, transcript: str) -> str:
     )
 
 
+# A single post should never take this long; a backend that does is hung.
+# Time it out so the scheduled run skips that episode (retried next tick)
+# instead of blocking until the service's 4h ceiling.
+LLM_TIMEOUT = 900  # seconds
+
+
 def run_llm(prompt: str, backend: str) -> str:
     """Send prompt on stdin to the headless CLI (claude-minimax / claude -p)."""
-    r = subprocess.run([backend, "-p"], input=prompt,
-                       capture_output=True, text=True)
+    try:
+        r = subprocess.run([backend, "-p"], input=prompt,
+                           capture_output=True, text=True, timeout=LLM_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"{backend} timed out after {LLM_TIMEOUT}s")
     if r.returncode != 0:
         raise RuntimeError(f"{backend} failed: {r.stderr.strip()[:500]}")
     return r.stdout.strip()
