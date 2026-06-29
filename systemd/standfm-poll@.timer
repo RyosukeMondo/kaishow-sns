@@ -1,0 +1,14 @@
+[Unit]
+Description=Poll stand.fm channel (%i) for new episodes every few minutes
+
+[Timer]
+# ~3-minute RSS poll. RandomizedDelaySec spreads channels off the exact
+# :00/:03 marks so a fleet doesn't hit stand.fm in lockstep. Persistent
+# fires one catch-up poll after sleep/boot. The heavy processing only runs
+# (via the service) when the poll actually finds new episodes.
+OnCalendar=*:0/3
+RandomizedDelaySec=45s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

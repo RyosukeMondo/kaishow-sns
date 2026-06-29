@@ -1,0 +1,14 @@
+[Unit]
+Description=stand.fm RSS poll (%i): cheap check, triggers sync if new
+# One RSS GET per tick; oneshot and idempotent. When new episodes appear it
+# starts standfm-sync@%i.service (the heavy transcribe/summarize/publish).
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/repos/stand-fm-scrape
+ExecStart=%h/repos/stand-fm-scrape/scripts/poll_channel.sh %i
+# A poll is one small fetch; keep the leash short so a hung request can't pile up.
+TimeoutStartSec=2m
+Nice=10

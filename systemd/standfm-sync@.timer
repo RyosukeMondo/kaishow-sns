@@ -2,8 +2,12 @@
 Description=Run stand.fm channel sync (%i) on a schedule
 
 [Timer]
-# Every 6 hours; catches up after suspend/boot. The pipeline is idempotent,
-# so a tick with no new episodes is just an RSS fetch.
+# Catch-all sweep every 6 hours: new-episode *detection* is handled in near
+# real time by standfm-poll@%i (3-min RSS poll → starts this unit). This
+# slower timer is the safety net — its pipeline is idempotent, so it picks
+# up anything the poll can't see (a scrape that didn't finish transcribing,
+# a failed summarize) and republishes. A tick with no new work is one RSS
+# fetch. Catches up after suspend/boot.
 OnCalendar=00/6:30
 RandomizedDelaySec=15m
 Persistent=true
